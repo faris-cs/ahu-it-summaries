@@ -1,11 +1,12 @@
 import Link from 'next/link';
-import { BookOpenCheck, Shield } from 'lucide-react';
+import Image from 'next/image';
+import { Shield } from 'lucide-react';
 
 export default function Navbar() {
   return <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#060b14]/80 backdrop-blur-xl">
     <nav className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6" aria-label="التنقل الرئيسي">
       <Link href="/" className="flex min-w-0 items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-blue-600/30 to-cyan-500/10 text-cyan-300"><BookOpenCheck size={22} /></span>
+        <Image src="/initiative-logo.jpeg" alt="شعار مبادرة أنت قدها والكلية معك" width={44} height={44} priority className="h-11 w-11 shrink-0 rounded-xl bg-white p-1 object-contain shadow-sm" />
         <span className="min-w-0"><span className="block truncate text-sm font-extrabold text-white sm:text-base">كلية تكنولوجيا المعلومات</span><span className="block truncate text-xs text-slate-400">جامعة الحسين بن طلال</span></span>
       </Link>
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
