@@ -13,35 +13,33 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!isAdminRequest(request)) return NextResponse.json({ error: 'بيانات الدخول غير صحيحة.' }, { status: 401 });
   try {
-    const form = await request.formData();
-    const file = form.get('file');
-    const title = String(form.get('title') || '').trim();
-    const course_name = String(form.get('course_name') || '').trim();
-    const course_code = String(form.get('course_code') || '').trim();
-    const major = String(form.get('major') || '');
-    const category = String(form.get('category') || '');
-    if (!title || !course_name || !course_code || !file || typeof file.arrayBuffer !== 'function') return NextResponse.json({ error: 'يرجى تعبئة جميع الحقول واختيار ملف PDF أو ZIP.' }, { status: 400 });
-    const originalName = String(file.name || '').trim();
-    const extension = originalName.match(/\.(pdf|zip)$/i)?.[0] || '';
-    const normalizedExtension = extension.toLowerCase();
-    const contentType = normalizedExtension === '.pdf' ? 'application/pdf' : normalizedExtension === '.zip' ? 'application/zip' : '';
-    const validMime = normalizedExtension === '.pdf'
-      ? (!file.type || file.type === 'application/pdf')
-      : normalizedExtension === '.zip'
-        ? (!file.type || ['application/zip', 'application/x-zip-compressed'].includes(file.type))
-        : false;
-    if (!extension || !validMime || file.size > 50 * 1024 * 1024) return NextResponse.json({ error: 'الملف يجب أن يكون PDF أو ZIP صالحاً وألا يتجاوز 50 ميغابايت.' }, { status: 400 });
-    if (!['CS', 'SE', 'CIS', 'CYS', 'CORE'].includes(major) || !['ملخص', 'سلايدات', 'سنوات سابقة'].includes(category)) return NextResponse.json({ error: 'التخصص أو نوع المصدر غير صالح.' }, { status: 400 });
+    const payload = await request.json();
+    if (!isAdminRequest(request, payload.password)) return NextResponse.json({ error: 'بيانات الدخول غير صحيحة.' }, { status: 401 });
     const supabase = getAdminSupabase();
-    const path = `${Date.now()}-${crypto.randomUUID()}${extension}`;
-    const { error: uploadError } = await supabase.storage.from('summaries').upload(path, Buffer.from(await file.arrayBuffer()), { contentType, upsert: false });
-    if (uploadError) throw uploadError;
-    const { data: publicData } = supabase.storage.from('summaries').getPublicUrl(path);
-    const { data, error } = await supabase.from('summaries').insert({ title, course_name, course_code, major, category, file_url: publicData.publicUrl }).select().single();
-    if (error) { await supabase.storage.from('summaries').remove([path]); throw error; }
-    return NextResponse.json({ summary: data }, { status: 201 });
+    if (payload.action === 'create-upload-url') {
+      const rawName = String(payload.fileName || '').split(/[\\/]/).pop().normalize('NFKC');
+      const safeName = rawName.replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^[.-]+|[.-]+$/g, '').slice(-120) || 'upload.bin';
+      const path = `${crypto.randomUUID()}-${safeName}`;
+      const { data, error } = await supabase.storage.from('summaries').createSignedUploadUrl(path);
+      if (error) throw error;
+      const { data: publicData } = supabase.storage.from('summaries').getPublicUrl(path);
+      return NextResponse.json({ signedUrl: data.signedUrl, token: data.token, path: data.path || path, publicUrl: publicData.publicUrl });
+    }
+    if (payload.action === 'save-record') {
+      const title = String(payload.title || '').trim();
+      const course_name = String(payload.course_name || '').trim();
+      const course_code = String(payload.course_code || '').trim();
+      const major = String(payload.major || '');
+      const category = String(payload.category || '');
+      const file_url = String(payload.file_url || '');
+      if (!title || !course_name || !course_code || !file_url) return NextResponse.json({ error: 'يرجى تعبئة جميع الحقول ورفع الملف.' }, { status: 400 });
+      if (!['CS', 'SE', 'CIS', 'CYS', 'CORE'].includes(major) || !['ملخص', 'سلايدات', 'سنوات سابقة'].includes(category)) return NextResponse.json({ error: 'التخصص أو نوع المصدر غير صالح.' }, { status: 400 });
+      const { data, error } = await supabase.from('summaries').insert({ title, course_name, course_code, major, category, file_url }).select().single();
+      if (error) throw error;
+      return NextResponse.json({ summary: data }, { status: 201 });
+    }
+    return NextResponse.json({ error: 'نوع العملية غير معروف.' }, { status: 400 });
   } catch (error) { return NextResponse.json({ error: error.message || 'تعذر رفع الملف.' }, { status: 500 }); }
 }
 
