@@ -18,9 +18,9 @@ export async function POST(request) {
     if (!isAdminRequest(request, payload.password)) return NextResponse.json({ error: 'بيانات الدخول غير صحيحة.' }, { status: 401 });
     const supabase = getAdminSupabase();
     if (payload.action === 'create-upload-url') {
-      const rawName = String(payload.fileName || '').split(/[\\/]/).pop().normalize('NFKC');
-      const safeName = rawName.replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^[.-]+|[.-]+$/g, '').slice(-120) || 'upload.bin';
-      const path = `${crypto.randomUUID()}-${safeName}`;
+      const fileName = String(payload.fileName || '');
+      const extension = fileName.match(/\.([a-z0-9]{1,10})$/i)?.[1].toLowerCase() || 'bin';
+      const path = `files/${Date.now()}-${crypto.randomUUID()}.${extension}`;
       const { data, error } = await supabase.storage.from('summaries').createSignedUploadUrl(path);
       if (error) throw error;
       const { data: publicData } = supabase.storage.from('summaries').getPublicUrl(path);
