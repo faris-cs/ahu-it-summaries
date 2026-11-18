@@ -19,9 +19,9 @@ create policy "Public can read summaries" on public.summaries
   for select to anon, authenticated using (true);
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('summaries', 'summaries', true, 52428800, array['application/pdf'])
+values ('summaries', 'summaries', true, 52428800, array['application/pdf', 'application/zip', 'application/x-zip-compressed'])
 on conflict (id) do update set public = true, file_size_limit = 52428800,
-  allowed_mime_types = array['application/pdf'];
+  allowed_mime_types = array['application/pdf', 'application/zip', 'application/x-zip-compressed'];
 
 drop policy if exists "Public can read summary PDFs" on storage.objects;
 create policy "Public can read summary PDFs" on storage.objects

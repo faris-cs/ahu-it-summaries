@@ -10,6 +10,13 @@ const categories = ['ملخص', 'سلايدات', 'سنوات سابقة'];
 const blank = { title: '', course_name: '', course_code: '', major: 'CS', category: 'ملخص' };
 
 function bytes(size) { return size < 1024 * 1024 ? `${(size / 1024).toFixed(0)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`; }
+function fileExtension(fileName) { return fileName.toLowerCase().endsWith('.zip') ? '.zip' : fileName.toLowerCase().endsWith('.pdf') ? '.pdf' : ''; }
+function isSupportedFile(file) {
+  const extension = fileExtension(file.name || '');
+  if (extension === '.pdf') return !file.type || file.type === 'application/pdf';
+  if (extension === '.zip') return !file.type || ['application/zip', 'application/x-zip-compressed'].includes(file.type);
+  return false;
+}
 
 export default function AdminPage() {
   const [password, setPassword] = useState('');
@@ -64,13 +71,13 @@ export default function AdminPage() {
   function chooseFile(candidate) {
     setError('');
     if (!candidate) return;
-    if (candidate.type !== 'application/pdf') { setError('يرجى اختيار ملف PDF فقط.'); return; }
+    if (!isSupportedFile(candidate)) { setError('يرجى اختيار ملف PDF أو ZIP صالح.'); return; }
     if (candidate.size > 50 * 1024 * 1024) { setError('حجم الملف يتجاوز الحد الأقصى (50 ميغابايت).'); return; }
     setFile(candidate);
   }
 
   async function upload(event) {
-    event.preventDefault(); if (!file) { setError('اختر ملف PDF أولاً.'); return; }
+    event.preventDefault(); if (!file) { setError('اختر ملف PDF أو ZIP أولاً.'); return; }
     setBusy(true); setError(''); setMessage('جارٍ رفع الملف وحفظ بياناته…');
     try {
       const data = new FormData(); Object.entries(form).forEach(([key, value]) => data.append(key, value)); data.append('file', file);
@@ -81,7 +88,7 @@ export default function AdminPage() {
   }
 
   async function remove(item) {
-    if (!window.confirm(`هل تريد حذف «${item.title}»؟ سيتم حذف ملف PDF أيضاً.`)) return;
+    if (!window.confirm(`هل تريد حذف «${item.title}»؟ سيتم حذف الملف أيضاً.`)) return;
     setDeleting(item.id); setError(''); setMessage('');
     try { const result = await request('/api/admin/summaries', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id }) }); await load(); if (result.warning) setError(result.warning); }
     catch (e) { setError(e.message); }
@@ -98,12 +105,12 @@ export default function AdminPage() {
     <div className="mb-8 flex flex-wrap items-center justify-between gap-4"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold text-cyan-300"><ShieldCheck size={15}/> إدارة آمنة للمحتوى</div><h1 className="text-2xl font-extrabold text-white sm:text-3xl">استوديو الملخصات</h1><p className="mt-2 text-sm text-slate-400">إضافة المواد وتنظيم مكتبة المصادر الأكاديمية.</p></div><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:text-white"><LogOut size={16}/> تسجيل الخروج</button></div>
     {error && <div role="alert" className="mb-5 rounded-xl border border-rose-500/20 bg-rose-500/[.06] px-4 py-3 text-sm text-rose-200">{error}</div>}{message && <div role="status" className="mb-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] px-4 py-3 text-sm text-emerald-200">{!busy && <CheckCircle2 size={17}/ >}{message}</div>}
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_1.15fr]">
-      <section className="h-fit rounded-2xl border border-slate-800 bg-[#0f172a] p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"><FilePlus2 size={19}/></span><div><h2 className="font-bold text-white">إضافة ملخص جديد</h2><p className="text-xs text-slate-500">أدخل بيانات المصدر ثم ارفع ملف PDF.</p></div></div>
+      <section className="h-fit rounded-2xl border border-slate-800 bg-[#0f172a] p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"><FilePlus2 size={19}/></span><div><h2 className="font-bold text-white">إضافة ملخص جديد</h2><p className="text-xs text-slate-500">أدخل بيانات المصدر ثم ارفع ملف PDF أو ZIP.</p></div></div>
         <form onSubmit={upload} className="space-y-4"><label className="block text-xs font-semibold text-slate-400">عنوان الملخص<input required value={form.title} onChange={(e) => setForm({...form, title:e.target.value})} placeholder="ملخص شابتر 1 و 2 - شامل" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#080e19] px-3.5 py-3 text-sm text-white outline-none focus:border-cyan-500/50"/></label>
           <label className="block text-xs font-semibold text-slate-400">اسم المادة<input required value={form.course_name} onChange={(e) => setForm({...form, course_name:e.target.value})} placeholder="هياكل البيانات - Data Structures" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#080e19] px-3.5 py-3 text-sm text-white outline-none focus:border-cyan-500/50"/></label>
           <div className="grid grid-cols-2 gap-3"><label className="block text-xs font-semibold text-slate-400">رمز المادة<input required dir="ltr" value={form.course_code} onChange={(e) => setForm({...form, course_code:e.target.value.toUpperCase()})} placeholder="CS211" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#080e19] px-3.5 py-3 text-sm font-mono text-white outline-none focus:border-cyan-500/50"/></label><label className="block text-xs font-semibold text-slate-400">التخصص<select value={form.major} onChange={(e) => setForm({...form, major:e.target.value})} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#080e19] px-3 py-3 text-xs text-white outline-none focus:border-cyan-500/50">{majors.map(([key, name])=><option key={key} value={key}>{name}</option>)}</select></label></div>
           <label className="block text-xs font-semibold text-slate-400">نوع المصدر<select value={form.category} onChange={(e) => setForm({...form, category:e.target.value})} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#080e19] px-3.5 py-3 text-sm text-white outline-none focus:border-cyan-500/50">{categories.map((name)=><option key={name}>{name}</option>)}</select></label>
-          <div onDragOver={(e)=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={(e)=>{e.preventDefault();setDragging(false);chooseFile(e.dataTransfer.files?.[0]);}} onClick={()=>inputRef.current?.click()} className={`cursor-pointer rounded-xl border border-dashed px-4 py-6 text-center transition ${dragging ? 'border-cyan-400 bg-cyan-400/[.06]' : 'border-slate-700 bg-[#080e19] hover:border-slate-500'}`}><input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e)=>chooseFile(e.target.files?.[0])}/>{file ? <div className="flex items-center justify-between gap-3 text-right"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-400/10 text-rose-300"><FileText size={19}/></span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-200">{file.name}</p><p className="mt-1 text-xs text-slate-500">{bytes(file.size)}</p></div></div><button type="button" aria-label="إزالة الملف" onClick={(e)=>{e.stopPropagation();setFile(null);if(inputRef.current)inputRef.current.value='';}} className="rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-white"><X size={17}/></button></div> : <><UploadCloud className="mx-auto text-cyan-300" size={25}/><p className="mt-3 text-sm font-semibold text-slate-300">اسحب ملف PDF وأفلته هنا</p><p className="mt-1 text-xs text-slate-500">أو انقر لاختيار ملف · الحد الأقصى 50 ميغابايت</p></>}</div>
+          <div onDragOver={(e)=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={(e)=>{e.preventDefault();setDragging(false);chooseFile(e.dataTransfer.files?.[0]);}} onClick={()=>inputRef.current?.click()} className={`cursor-pointer rounded-xl border border-dashed px-4 py-6 text-center transition ${dragging ? 'border-cyan-400 bg-cyan-400/[.06]' : 'border-slate-700 bg-[#080e19] hover:border-slate-500'}`}><input ref={inputRef} type="file" accept=".pdf,.zip,application/pdf,application/zip,application/x-zip-compressed" className="hidden" onChange={(e)=>chooseFile(e.target.files?.[0])}/>{file ? <div className="flex items-center justify-between gap-3 text-right"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-400/10 text-rose-300"><FileText size={19}/></span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-200">{file.name}</p><p className="mt-1 text-xs text-slate-500">{bytes(file.size)}</p></div></div><button type="button" aria-label="إزالة الملف" onClick={(e)=>{e.stopPropagation();setFile(null);if(inputRef.current)inputRef.current.value='';}} className="rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-white"><X size={17}/></button></div> : <><UploadCloud className="mx-auto text-cyan-300" size={25}/><p className="mt-3 text-sm font-semibold text-slate-300">اسحب ملف PDF أو ZIP وأفلته هنا</p><p className="mt-1 text-xs text-slate-500">أو انقر لاختيار ملف · الحد الأقصى 50 ميغابايت</p></>}</div>
           <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"><UploadCloud size={17}/>{busy ? 'جارٍ الرفع…' : 'رفع الملخص'}</button>
         </form>
       </section>

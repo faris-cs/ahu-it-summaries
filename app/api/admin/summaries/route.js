@@ -22,12 +22,21 @@ export async function POST(request) {
     const course_code = String(form.get('course_code') || '').trim();
     const major = String(form.get('major') || '');
     const category = String(form.get('category') || '');
-    if (!title || !course_name || !course_code || !file || typeof file.arrayBuffer !== 'function') return NextResponse.json({ error: 'يرجى تعبئة جميع الحقول واختيار ملف PDF.' }, { status: 400 });
-    if (file.type !== 'application/pdf' || file.size > 50 * 1024 * 1024) return NextResponse.json({ error: 'الملف يجب أن يكون PDF وألا يتجاوز 50 ميغابايت.' }, { status: 400 });
+    if (!title || !course_name || !course_code || !file || typeof file.arrayBuffer !== 'function') return NextResponse.json({ error: 'يرجى تعبئة جميع الحقول واختيار ملف PDF أو ZIP.' }, { status: 400 });
+    const originalName = String(file.name || '').trim();
+    const extension = originalName.match(/\.(pdf|zip)$/i)?.[0] || '';
+    const normalizedExtension = extension.toLowerCase();
+    const contentType = normalizedExtension === '.pdf' ? 'application/pdf' : normalizedExtension === '.zip' ? 'application/zip' : '';
+    const validMime = normalizedExtension === '.pdf'
+      ? (!file.type || file.type === 'application/pdf')
+      : normalizedExtension === '.zip'
+        ? (!file.type || ['application/zip', 'application/x-zip-compressed'].includes(file.type))
+        : false;
+    if (!extension || !validMime || file.size > 50 * 1024 * 1024) return NextResponse.json({ error: 'الملف يجب أن يكون PDF أو ZIP صالحاً وألا يتجاوز 50 ميغابايت.' }, { status: 400 });
     if (!['CS', 'SE', 'CIS', 'CYS', 'CORE'].includes(major) || !['ملخص', 'سلايدات', 'سنوات سابقة'].includes(category)) return NextResponse.json({ error: 'التخصص أو نوع المصدر غير صالح.' }, { status: 400 });
     const supabase = getAdminSupabase();
-    const path = `${Date.now()}-${crypto.randomUUID()}.pdf`;
-    const { error: uploadError } = await supabase.storage.from('summaries').upload(path, Buffer.from(await file.arrayBuffer()), { contentType: 'application/pdf', upsert: false });
+    const path = `${Date.now()}-${crypto.randomUUID()}${extension}`;
+    const { error: uploadError } = await supabase.storage.from('summaries').upload(path, Buffer.from(await file.arrayBuffer()), { contentType, upsert: false });
     if (uploadError) throw uploadError;
     const { data: publicData } = supabase.storage.from('summaries').getPublicUrl(path);
     const { data, error } = await supabase.from('summaries').insert({ title, course_name, course_code, major, category, file_url: publicData.publicUrl }).select().single();
