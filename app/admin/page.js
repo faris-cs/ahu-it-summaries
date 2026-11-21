@@ -30,7 +30,8 @@ export default function AdminPage() {
   const request = useCallback(async (path, options = {}) => {
     const saved = sessionStorage.getItem(PASSWORD_KEY) || password;
     const response = await fetch(path, { ...options, headers: { ...(options.headers || {}), 'x-admin-password': saved } });
-    const data = await response.json();
+    const data = response.headers.get('content-type')?.includes('application/json') ? await response.json() : {};
+    if (response.status === 404 || response.status === 405) throw new Error('خدمات الإدارة غير متاحة. تحقق من نشر Cloudflare Pages Functions مع الموقع.');
     if (!response.ok) throw new Error(data.error || 'حدث خطأ غير متوقع.');
     return data;
   }, [password]);
@@ -45,7 +46,7 @@ export default function AdminPage() {
     if (!saved) { setChecking(false); return; }
     setPassword(saved);
     fetch('/api/admin/summaries', { headers: { 'x-admin-password': saved } }).then(async (r) => {
-      if (r.ok) { const data = await r.json(); setItems(data.summaries || []); setAuthenticated(true); }
+      if (r.ok && r.headers.get('content-type')?.includes('application/json')) { const data = await r.json(); setItems(data.summaries || []); setAuthenticated(true); }
       else sessionStorage.removeItem(PASSWORD_KEY);
     }).catch(() => {}).finally(() => setChecking(false));
   }, []);
@@ -54,7 +55,8 @@ export default function AdminPage() {
     event.preventDefault(); setLoginBusy(true); setError('');
     try {
       const response = await fetch('/api/admin/summaries', { headers: { 'x-admin-password': password } });
-      const data = await response.json();
+      const data = response.headers.get('content-type')?.includes('application/json') ? await response.json() : {};
+      if (response.status === 404 || response.status === 405) throw new Error('خدمات الإدارة غير متاحة. تحقق من نشر Cloudflare Pages Functions مع الموقع.');
       if (!response.ok) throw new Error(data.error || 'تعذر تسجيل الدخول.');
       sessionStorage.setItem(PASSWORD_KEY, password); setItems(data.summaries || []); setAuthenticated(true);
     } catch (e) { setError(e.message); }
