@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { Shield } from 'lucide-react';
 
 export default function Navbar() {
-  return <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#060b14]/80 backdrop-blur-xl">
+  return <header className="safe-area-top sticky top-0 z-40 border-b border-slate-800/80 bg-[#060b14]/95">
     <nav className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6" aria-label="التنقل الرئيسي">
       <Link href="/" className="flex min-w-0 items-center gap-3">
         <Image src="/initiative-logo.jpeg" alt="شعار مبادرة أنت قدها والكلية معك" width={44} height={44} priority className="h-11 w-11 shrink-0 rounded-xl bg-white p-1 object-contain shadow-sm" />

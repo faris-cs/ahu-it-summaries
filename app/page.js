@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 import Hero from '@/components/Hero';
 import SummaryCard, { MAJORS } from '@/components/SummaryCard';
@@ -19,16 +19,60 @@ export default function HomePage() {
   const [major, setMajor] = useState('ALL');
   const [category, setCategory] = useState('ALL');
   const [preview, setPreview] = useState(null);
+  const mounted = useRef(false);
+  const activeRequest = useRef(null);
 
   const loadSummaries = useCallback(async () => {
-    if (!supabase) { setError('أضف إعدادات Supabase إلى ملف البيئة لتفعيل المنصة.'); setLoading(false); return; }
-    const { data, error: fetchError } = await supabase.from('summaries').select('*').order('created_at', { ascending: false });
-    if (fetchError) setError('تعذر تحميل الملخصات حالياً. تحقق من إعدادات قاعدة البيانات ثم أعد المحاولة.');
-    else { setSummaries(data || []); setError(''); }
-    setLoading(false);
+    if (!mounted.current) return;
+    setLoading(true);
+    setError('');
+    if (!supabase) {
+      setError('إعدادات المنصة غير مكتملة حالياً. حاول تحديث الصفحة لاحقاً.');
+      setLoading(false);
+      return;
+    }
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const requestState = { controller };
+    activeRequest.current = requestState;
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        if (controller) controller.abort();
+        reject(new Error('summary request timed out'));
+      }, 12000);
+    });
+
+    try {
+      let queryRequest = supabase.from('summaries').select('*').order('created_at', { ascending: false });
+      if (controller && typeof queryRequest.abortSignal === 'function') queryRequest = queryRequest.abortSignal(controller.signal);
+      const { data, error: fetchError } = await Promise.race([queryRequest, timeout]);
+      if (fetchError) throw fetchError;
+      if (mounted.current && activeRequest.current === requestState) {
+        setSummaries(data || []);
+        setError('');
+      }
+    } catch (fetchError) {
+      if (mounted.current && activeRequest.current === requestState) {
+        setError('تعذر تحميل الملخصات حالياً. تحقق من اتصالك ثم أعد المحاولة.');
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (activeRequest.current === requestState) {
+        activeRequest.current = null;
+        if (mounted.current) setLoading(false);
+      }
+    }
   }, []);
 
-  useEffect(() => { loadSummaries(); }, [loadSummaries]);
+  useEffect(() => {
+    mounted.current = true;
+    loadSummaries();
+    return () => {
+      mounted.current = false;
+      if (activeRequest.current?.controller) activeRequest.current.controller.abort();
+    };
+  }, [loadSummaries]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('major') && majorFilters.some(([code]) => code === params.get('major'))) setMajor(params.get('major'));
@@ -53,7 +97,7 @@ export default function HomePage() {
         <div className="mt-5"><div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-400"><SlidersHorizontal size={14}/> التخصص</div><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">{majorFilters.map(([code, label]) => <button key={code} onClick={() => setMajor(code)} className={`shrink-0 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${major === code ? 'border-blue-500/50 bg-blue-600/15 text-blue-200' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200'}`}>{label}</button>)}</div></div>
         <div className="mt-4"><div className="mb-3 text-xs font-bold text-slate-400">نوع المصدر</div><div className="flex flex-wrap gap-2">{categories.map(([code, label]) => <button key={code} onClick={() => setCategory(code)} className={`rounded-lg px-3.5 py-2 text-xs font-bold transition ${category === code ? 'bg-cyan-400/10 text-cyan-200 ring-1 ring-cyan-400/25' : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'}`}>{label}</button>)}</div></div>
       </div>
-      {error && <div role="alert" className="mt-6 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[.06] p-4 text-sm text-amber-200"><AlertCircle size={18} className="mt-0.5 shrink-0"/>{error}</div>}
+      {error && <div role="alert" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[.06] p-4 text-sm text-amber-200"><span className="flex items-start gap-3"><AlertCircle size={18} className="mt-0.5 shrink-0"/>{error}</span><button onClick={loadSummaries} className="shrink-0 rounded-lg border border-amber-400/20 px-3 py-2 text-xs font-bold text-amber-100 transition hover:bg-amber-400/10">إعادة المحاولة</button></div>}
       <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{loading ? Array.from({ length: 6 }, (_, i) => <SkeletonCard key={i}/>) : filtered.map((summary) => <SummaryCard key={summary.id} summary={summary} onPreview={setPreview}/>)}</div>
       {!loading && !error && filtered.length === 0 && <div className="mt-7 rounded-2xl border border-dashed border-slate-700 bg-slate-900/30 px-5 py-16 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-slate-400"><Search size={24}/></span><h3 className="mt-5 text-lg font-bold text-slate-200">لا توجد نتائج مطابقة</h3><p className="mt-2 text-sm text-slate-500">جرّب تغيير كلمات البحث أو اختيار تخصص ونوع مصدر آخر.</p><button onClick={() => { setQuery(''); setMajor('ALL'); setCategory('ALL'); }} className="mt-5 text-sm font-bold text-cyan-300 hover:text-cyan-200">إعادة ضبط عوامل التصفية</button></div>}
     </section><PdfModal summary={preview} onClose={() => setPreview(null)}/>

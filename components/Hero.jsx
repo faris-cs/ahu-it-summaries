@@ -8,7 +8,7 @@ export default function Hero({ stats }) {
     { label: 'تخصصات أكاديمية', value: stats.majors, icon: GraduationCap, color: 'text-amber-300' },
   ];
   return <section className="relative isolate overflow-hidden border-b border-slate-800/70">
-    <div className="hero-glow grid-pattern absolute inset-0 -z-10 animate-pulse-glow" /><div className="absolute -top-32 left-1/2 -z-10 h-80 w-80 -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl" />
+    <div className="hero-glow grid-pattern absolute inset-0 -z-10" />
     <div className="mx-auto max-w-7xl px-4 pb-14 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-24">
       <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/[.06] px-4 py-2 text-xs font-bold text-cyan-200 sm:text-sm"><span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#06b6d4]" />مبادرة أنت قدها والكلية معك</div>
       <div className="mx-auto mt-7 w-full max-w-3xl rounded-2xl border border-slate-700/50 bg-white p-2 shadow-lg sm:p-3">
