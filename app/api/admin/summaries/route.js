@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminSupabase, isAdminRequest } from '@/lib/admin';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 export async function GET(request) {
   if (!isAdminRequest(request)) return NextResponse.json({ error: 'بيانات الدخول غير صحيحة.' }, { status: 401 });
